@@ -142,4 +142,14 @@ We offer a list of useful references as a starting point:
 
 This section will be updated with the Frequently Asked Questions during the course of this project. Please stay tuned.
 
-### 1 -
+### 1 - Q: Do we need to take into account walking times at the connections?
+* A: Yes, but since we do not have the details of the platforms at each location, you can use a universal formulae to come up with a reasonable walking time.
+Note that your solution must allow connections between different modes of transports, such as from bus to tramways.
+
+### 2 - Q: Can we assume statistical independence between the observed delays?
+* A: Yes, see simplifying assumptions in **Problem Description**.
+You will incure no penality for assuming that the delay of a given train (or other mode of transport, ...), at a given location and time is
+independent of the delays for all other trains, locations, and times. Even if our experience tells us that this is most of the time not the case.
+Also, you must assume that you have no real-time delays information at the time you plan your journey, which limits the benefits you could gain by assuming such a dependency. 
+
+
