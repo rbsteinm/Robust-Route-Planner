@@ -155,6 +155,6 @@ Also, you must assume that you have no real-time delays information at the time 
 ### 3 - Q: Can I take advantage of the fact that a connection departs late most of the time to allow a plan that would otherwise not be possible according to the official schedule.
 * A: You may discover that you could take advantage of connections that have a high probability of departing late in order to allow a connection.
 However, this is not recommended, or it should come with a warning.
-Imagine from a user experience perspective, how you would react if you are being proposed a plan in which a connection is supposed to depart before you arrive.
-More importantly, who would you blame if the plan fails: the planner that came up with a theoretically infeasible plan, or the operator who respected their schedule?
+Imagine from a user experience perspective, how would you react if you are being proposed a plan in which a connection is supposed to depart before you arrive.
+Furthermore, who would you blame if the plan fails: the planner that came up with a theoretically infeasible plan, or the operator who respected their schedule?
 
