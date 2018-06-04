@@ -19,7 +19,7 @@ def hav(x):
     return (1-cos(x))/2
 
 # models the network for the day given in parameter
-# returns a dict of edge like: stopA -> (stopB,departure_time,arrival_time)
+# returns a dict of edge like: stopA -> stopB -> [(dep_time1,arr_time1), (dep_time2,arr_time2), ...]
 def model_network(df, date):
     df2 = df.filter(df.date == date)
     df2 = df2.select('stop_id', 'next_sid', 'schedule_dep', 'next_sched_arr')
@@ -28,10 +28,17 @@ def model_network(df, date):
     edges = dict()
     for row in rows:
         if not row[0] in edges:
-            edges[row[0]] = []
-        edges[row[0]].append((row[1], row[2], row[3]))
+            edges[row[0]] = dict()
+        if not row[1] in edges[row[0]]:
+            edges[row[0]][row[1]] = []
+        edges[row[0]][row[1]].append((row[2], row[3]))
+        
+    # sort the list according to departure times
+    for stopA in edges:
+        for stopB in edges[stopA]:
+            edges[stopA][stopB].sort(key=lambda x: x[0])
+    
     return edges
-    print(df2.count())
     
 # get the duration in seconds from t2 to t1
 # t2 > t1
