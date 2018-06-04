@@ -33,6 +33,11 @@ def model_network(df, date):
     return edges
     print(df2.count())
     
+# get the duration in seconds from t2 to t1
+# t2 > t1
+def get_duration(t1, t2):
+    return (datetime.strptime(t2, '%Y-%m-%d %H:%M:%S') - datetime.strptime(t1, '%Y-%m-%d %H:%M:%S')).total_seconds()
+    
 
     
 #######################################################################
@@ -69,4 +74,7 @@ def stop_type(schedule_departure, schedule_arrival):
     
 @functions.udf
 def edge_is_valid(tid, time, sid, stop_type, next_tid, next_time, next_sid, next_stop_type):
-    return (time <= next_time and tid == next_tid and stop_type!='last' and next_stop_type!='first')
+    # sometimes, the last and first stop types are not correct due to malformated data
+    # to fix this issue, we consider that if a trip is longer than 10 hours, it can be discarded
+    duration = (datetime.strptime(next_time, '%Y-%m-%d %H:%M:%S') - datetime.strptime(time, '%Y-%m-%d %H:%M:%S')).total_seconds()/3600
+    return (time <= next_time and tid == next_tid and stop_type!='last' and next_stop_type!='first' and duration < 10)
