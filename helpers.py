@@ -44,6 +44,15 @@ def model_network(df, date):
 # t2 > t1
 def get_duration(t1, t2):
     return (datetime.strptime(t2, '%Y-%m-%d %H:%M:%S') - datetime.strptime(t1, '%Y-%m-%d %H:%M:%S')).total_seconds()
+
+def str_to_date(string):
+    return datetime.strptime(string, '%Y-%m-%d %H:%M:%S')
+
+# converts the date strings to datetime objects
+def network_to_datetime(network):
+    for i in network.keys():
+        for j in network[i].keys():
+            network[i][j] = [(str_to_date(a),str_to_date(b)) for (a,b) in network[i][j]]
     
 
     
@@ -65,7 +74,15 @@ def date_choice(arr_time, dep_time):
     returns a column that contains the departure time, or the arrival time if it's null
     this will serve to reconstruct the network from the trip's schedules
     '''
-    return dep_time if arr_time is None else arr_time
+    if arr_time is None:
+        return dep_time
+    elif dep_time is None:
+        return arr_time
+    else:
+        arr_ts = datetime.strptime(arr_time, '%Y-%m-%d %H:%M:%S').timestamp()
+        dep_ts = datetime.strptime(dep_time, '%Y-%m-%d %H:%M:%S').timestamp()
+        mean = (dep_ts+arr_ts)/2
+        return datetime.fromtimestamp(mean).strftime('%Y-%m-%d %H:%M:%S')
 
 @functions.udf
 def stop_type(schedule_departure, schedule_arrival):
@@ -80,8 +97,8 @@ def stop_type(schedule_departure, schedule_arrival):
         return 'mid'
     
 @functions.udf
-def edge_is_valid(tid, time, sid, stop_type, next_tid, next_time, next_sid, next_stop_type):
+def edge_is_valid(tid, time, sid, stop_type, next_tid, next_time, next_sid, next_stop_type, dep, next_arr):
     # sometimes, the last and first stop types are not correct due to malformated data
     # to fix this issue, we consider that if a trip is longer than 10 hours, it can be discarded
     duration = (datetime.strptime(next_time, '%Y-%m-%d %H:%M:%S') - datetime.strptime(time, '%Y-%m-%d %H:%M:%S')).total_seconds()/3600
-    return (time <= next_time and tid == next_tid and stop_type!='last' and next_stop_type!='first' and duration < 10)
+    return (time <= next_time and tid == next_tid and stop_type!='last' and next_stop_type!='first' and duration < 10 and dep <= next_arr)
