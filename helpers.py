@@ -65,7 +65,7 @@ def date_choice(arr_time, dep_time):
     returns a column that contains the departure time, or the arrival time if it's null
     this will serve to reconstruct the network from the trip's schedules
     '''
-    return arr_time if dep_time is None else dep_time
+    return dep_time if arr_time is None else arr_time
 
 @functions.udf
 def stop_type(schedule_departure, schedule_arrival):
