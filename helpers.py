@@ -47,13 +47,28 @@ def reduce_path(path):
     previous_edge = path[0]
     first_edge = path[0]
     #first_stop, first_stop_dep = path[0][0], path[0][2]
+    length = 0 # number of hops of this subpath
     for (i, edge) in enumerate(path):
+        length += 1
         # if we change bus or it's the last hop of the path
         if edge[5] != previous_edge[5] or i+1 == len(path):
-            res.append((first_edge[0], previous_edge[1], first_edge[2],previous_edge[3], previous_edge[5]))
+            res.append((first_edge[0], previous_edge[1], first_edge[2],previous_edge[3], previous_edge[5], length))
+            length = 0
             first_edge = edge
         previous_edge = edge
     return res
+
+def reduced_path_tostring(red_path, stations):
+    for path in red_path:
+        stop_a = stations[path[0]]['name']
+        stop_b = stations[path[1]]['name']
+        time_a = path[2].strftime('%H:%M')
+        time_b = path[3].strftime('%H:%M')
+        line = path[4]
+        text = 'line ' + str(line) + ' from ' + stop_a + ' to ' + stop_b + ' '
+        text += time_a + ' -> ' + time_b + '(' + str(path[5]) + ' stops)'
+        print(text)
+            
             
 #######################################################################
 #___________________________ MODEL NETWORK ____________________________
@@ -97,7 +112,7 @@ def compute_walking_time(distance, walking_speed=5.04):
     """distance in km, speed in km/h, returns time in datetime format"""
     return timedelta(hours=(distance / walking_speed))
 
-def compute_walking_network(stations, max_walk_dist=1):
+def compute_walking_network(stations, max_walk_dist=0.5):
     """
     computes the time you need to walk between any two nodes in the network
     in the form {A -> B -> time} and {B -> A -> time}
@@ -119,19 +134,26 @@ def compute_walking_network(stations, max_walk_dist=1):
 #___________________________ SHORTEST PATH ____________________________
 #######################################################################
     
-def get_next_correspondance(edges, current_time, walking_network, source, dest):
+def get_next_correspondance(edges, current_time, walking_network, source, dest, prev_tid):
     """
     returns departure/arrival times of the first ride departing after the current time
     assumes that the list current_time is sorted according to departure times!
+    prev_tid: trip_id of the edge that led to source. Allows us to check if there is a change of bus at dest,
+    in which case we will add one minute to the current time to take changing time into account
     """
     tid, line = None,None
     # if the edge exists for the rides
     if source in edges and dest in edges[source]:
-        times = edges[source][dest]
+        times = edges[source][dest] # list of schedules form source to destinations
         # index of the fist ride departing after the current time
         index = np.searchsorted([x[0] for x in times], current_time)
         # None if there is no more ride at this time
         (dep,arr,tid,line) = times[index] if index < len(times) else (None,None,None,None)
+        # If you have less than one minute for a change of vehicule, that's not acceptable
+        # add 60 second to the current time and seach again for the next correspondance
+        if tid is not None and prev_tid!=tid and current_time==dep:
+            index = np.searchsorted([x[0] for x in times], current_time+timedelta(seconds=60))
+            (dep,arr,tid,line) = times[index] if index < len(times) else (None,None,None,None)
     else:
         (dep,arr) = (None,None) # None if there is no edge by vehicule
         
@@ -175,8 +197,9 @@ def shortest_path(models, walking_network, stations, source, destination, depart
         # if this is the destination node, we can terminate
         if u == destination:
             path = []
+            # reconstruct the shortest path
             while prev[u][0] != source:
-                assert(prev[u][0] is not None), 'Could not find a path from ' + str(stations[source].name) + ' to ' + str(stations[destination].name)
+                assert(prev[u][0] is not None),'no path from ' + stations[source].name + ' to ' + stations[destination].name
                 assert(len(path) < 300), 'Path has more than 300 hops too long, something is wrong ...'
                 current_edge = (prev[u][0],u,prev[u][1],prev[u][2],prev[u][3],prev[u][4])
                 path.insert(0,current_edge)
@@ -190,17 +213,50 @@ def shortest_path(models, walking_network, stations, source, destination, depart
         walk_neighbors = set(walking_network[u].keys())
         for v in neighbors.union(walk_neighbors):
             # take the first correspondance
-            (dep_time, arr_time,tid,line) = get_next_correspondance(edges, current_time, walking_network, u, v)
+            (dep_time, arr_time,tid,line) = get_next_correspondance(edges, current_time, walking_network, u, v, prev[u][3])
             # there is no more correspondance for this edge
             if dep_time is None:
                 continue
-            dist_u_v = arr_time - dep_time
-            waiting_time = dep_time - current_time
+            dist_u_v = arr_time - dep_time # travelling time
+            waiting_time = dep_time - current_time # waiting time at the station
             arr_v = current_time + waiting_time + dist_u_v # determine at what time you'll arrive to v
             # a shorter path to v has been found
             if arr_v < dist[v]:
                 dist[v] = arr_v
                 prev[v] = (u,dep_time,arr_time,tid,line)
             
-    
     raise Exception('No path was found from source to destination')
+    
+
+#######################################################################
+#______________________ BFS (REACHABLE STATIONS) ______________________
+#######################################################################
+
+    
+def get_neighbors(network, walking_network, station_id):
+    '''
+    return all the direct neighbors of station_id, either by bus or foot
+    does not take the schedules into account!
+    '''
+    neighbors = set()
+    if station_id in network:
+        for neigh in network[station_id].keys():
+            neighbors.add(neigh)
+    if station_id in walking_network:
+        for neigh in walking_network[station_id].keys():
+            neighbors.add(neigh)
+    return neighbors
+
+def get_reachable_stations(network, walking_network, source):
+    '''
+    returns all the stations reachable from source, either by foot or bus
+    does not take the schedules into account!
+    '''
+    visited, queue = set(), [source]
+    while queue:
+        node = queue.pop(0)
+        if node not in visited:
+            visited.add(node)
+            neighbors = get_neighbors(network, walking_network, node)
+            queue.extend(neighbors - visited)
+    return visited
