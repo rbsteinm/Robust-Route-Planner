@@ -1,6 +1,7 @@
 from math import sqrt, cos, radians, asin
 from datetime import datetime, timedelta
 import numpy as np
+import pickle
 
 #######################################################################
 #______________________________ HELPERS _______________________________
@@ -35,7 +36,24 @@ def network_to_datetime(network):
     for i in network.keys():
         for j in network[i].keys():
             network[i][j] = [(str_to_date(dep),str_to_date(arr),tid,line) for (dep,arr,tid,line) in network[i][j]]
-            
+
+def load_metadata():
+    with open('./data/metadata.pickle', 'rb') as handle:
+        stations = pickle.load(handle)
+    return stations
+
+def reduce_path(path):
+    res = []
+    previous_edge = path[0]
+    first_edge = path[0]
+    #first_stop, first_stop_dep = path[0][0], path[0][2]
+    for (i, edge) in enumerate(path):
+        # if we change bus or it's the last hop of the path
+        if edge[5] != previous_edge[5] or i+1 == len(path):
+            res.append((first_edge[0], previous_edge[1], first_edge[2],previous_edge[3], previous_edge[5]))
+            first_edge = edge
+        previous_edge = edge
+    return res
             
 #######################################################################
 #___________________________ MODEL NETWORK ____________________________
@@ -62,6 +80,18 @@ def model_network(df, date):
             edges[stopA][stopB].sort(key=lambda x: x[0])
     
     return edges
+
+def load_networks():
+    '''
+    loads the train network for each day of the week
+    '''
+    models = []
+    days_names = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday']
+    for day in days_names:
+        with open('./data/'+ day +'.pickle', 'rb') as handle:
+            network = pickle.load(handle)
+        models.append(network)
+    return models
 
 def compute_walking_time(distance, walking_speed=5.04):
     """distance in km, speed in km/h, returns time in datetime format"""
