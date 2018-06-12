@@ -1,17 +1,17 @@
-from flask import Flask
+from flask import Flask, render_template, jsonify
 import helpers
 from datetime import datetime
 app = Flask(__name__)
 
+
+stations = helpers.load_metadata()
+models = helpers.load_networks()
+walking_network = helpers.compute_walking_network(stations)
+
 @app.route('/')
-def hello_world():
-    stations = helpers.load_metadata()
-    models = helpers.load_networks()
-    walking_network = helpers.compute_walking_network(stations)
-    x = helpers.shortest_path(models,walking_network,stations,8576218, 8590727, datetime(2018, 1, 15, 14))
-    #x = helpers.hav(2)
-    y = helpers.reduce_path(x)
-    text = '<p>'
+def index():
+    return render_template('index.html',name=None)
+    return page
     for path in y:
         stop_a = stations[path[0]]['name']
         stop_b = stations[path[1]]['name']
@@ -21,3 +21,19 @@ def hello_world():
         text += 'line ' + str(line) + '<br> from ' + stop_a + ' to ' + stop_b
         text += '<br>' + time_a + ' -> ' + time_b + '<br><br>' + '</p>'
     return '<h2>Path</h2><p>'+text+'</p>'
+
+@app.route('/get_stations')
+def get_stations():
+    return jsonify({str(key): stations[key] for key in stations.keys()})
+
+@app.route('/receiver', methods = ['POST'])
+def worker():
+    # read json + reply
+    data = request.get_json()
+    result = ''
+
+    for item in data:
+        # loop over every row
+        result += str(item['make']) + '\n'
+
+    return result
