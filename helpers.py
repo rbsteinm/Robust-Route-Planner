@@ -68,6 +68,21 @@ def reduced_path_tostring(red_path, stations):
         text = 'line ' + str(line) + ' from ' + stop_a + ' to ' + stop_b + ' '
         text += time_a + ' -> ' + time_b + '(' + str(path[5]) + ' stops)'
         print(text)
+
+
+def reduced_path_to_json(l):
+    d = {}
+    for i in range(len(l)):
+        subpath = {
+            'source': str(l[i][0]),
+            'dest': str(l[i][1]),
+            'dep_time': l[i][2].strftime("%Y-%m-%d %H:%M"),
+            'arr_time': l[i][3].strftime("%Y-%m-%d %H:%M"),
+            'line': l[i][4],
+            'nhops': str(l[i][5]),
+        }
+        d[i] = subpath
+    return d
             
             
 #######################################################################

@@ -1,4 +1,9 @@
-from flask import Flask, render_template, jsonify
+#!flask/bin/python
+
+import sys
+import random, json
+
+from flask import Flask, render_template, jsonify, request, redirect, Response
 import helpers
 from datetime import datetime
 app = Flask(__name__)
@@ -30,10 +35,26 @@ def get_stations():
 def worker():
     # read json + reply
     data = request.get_json()
-    result = ''
+    print(request.get_json())
+    date = data['date']
+    destination = int(data['station'])
+    x = helpers.shortest_path(models,walking_network,stations,8503000, destination, datetime(int(date['year']), int(date['month']), int(date['day']), int(date['hour']),int(date['minute'])))
+    y = helpers.reduce_path(x)
+    print(helpers.reduced_path_to_json(y))
+    #print(y)
+    #return render_template('test.html', name=None)
+    return jsonify(result={'data':helpers.reduced_path_to_json(y)})
 
-    for item in data:
-        # loop over every row
-        result += str(item['make']) + '\n'
 
-    return result
+
+
+@app.route('/eval/')              
+def eval():
+        return render_template("test.html")
+
+
+
+
+if __name__ == '__main__':
+    # run!
+    app.run()
