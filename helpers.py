@@ -42,7 +42,7 @@ def load_metadata():
         stations = pickle.load(handle)
     return stations
 
-def reduce_path(path):
+'''def reduce_path(path):
     res = []
     previous_edge = path[0]
     first_edge = path[0]
@@ -52,11 +52,33 @@ def reduce_path(path):
         length += 1
         # if we change bus or it's the last hop of the path
         if edge[5] != previous_edge[5] or i+1 == len(path):
+            if(i+1==len(path)):
+               print('last')
             res.append((first_edge[0], previous_edge[1], first_edge[2],previous_edge[3], previous_edge[5], length))
             length = 0
             first_edge = edge
         previous_edge = edge
-    return res
+    return res'''
+
+
+def reduce_path(path):
+    all_rides = []
+    current_ride = []
+    i = 0
+    prev_line = None
+    while(i < len(path)):
+        current_line = path[i][5]
+        if current_line != prev_line:
+            all_rides.append(current_ride)
+            current_ride = [path[i]]
+        else:
+            current_ride.append(path[i])
+        prev_line = current_line
+        i += 1
+    # append last ride
+    all_rides.append(current_ride)
+    return [(ride[0][0],ride[-1][1], ride[0][2], ride[-1][3], ride[0][5], len(ride)) for ride in all_rides if len(ride) > 0]
+            
 
 def reduced_path_tostring(red_path, stations):
     for path in red_path:
@@ -241,6 +263,123 @@ def shortest_path(models, walking_network, stations, source, destination, depart
                 prev[v] = (u,dep_time,arr_time,tid,line)
             
     raise Exception('No path was found from source to destination')
+    
+    
+#######################################################################
+#_______________________ REVERSE SHORTEST PATH ________________________
+#######################################################################
+
+def get_next_correspondance_reverse(edges, current_time, walking_network, source, dest, prev_tid):
+    """
+    returns departure/arrival times of the first ride departing after the current time
+    assumes that the list current_time is sorted according to departure times!
+    prev_tid: trip_id of the edge that led to source. Allows us to check if there is a change of bus at dest,
+    in which case we will add one minute to the current time to take changing time into account
+    
+    Here since we are in reverse:
+    - we follow the reverse edge from u to v
+    - original edges goes v -> u, or dest -> source
+    - source==u and dest==v
+    - dep is the time at which you leave v and arr is the time at which you arrive at u
+    """
+    tid, line = None,None
+    # if the edge exists for the rides (here source is v and dest is u)
+    if source in edges and dest in edges[source]:
+        times = edges[source][dest] # list of schedules form source to destinations
+        # index of the fist ride arriving before the current time
+        index = np.searchsorted([x[1] for x in times], current_time) - 1
+        # None if there is no ride that can make you arrive at this time
+        (dep,arr,tid,line) = times[index] if index >= 0 else (None,None,None,None)
+        # If you have less than one minute for a change of vehicule, that's not acceptable
+        # add 60 second to the current time and seach again for the next correspondance
+        if tid is not None and prev_tid!=tid and current_time==arr:
+            index = np.searchsorted([x[1] for x in times], current_time-timedelta(seconds=60)) - 1
+            (dep,arr,tid,line) = times[index] if index >= 0 else (None,None,None,None)
+    else:
+        (dep,arr) = (None,None) # None if there is no edge by vehicule
+        
+    # determine if you can reach dest from source by foot
+    if source in walking_network and dest in walking_network[source]:
+        walk_time = walking_network[source][dest]
+        (dep_walk,arr_walk) = (current_time-walk_time,current_time)
+    else:
+        (dep_walk,arr_walk) = (None,None)
+    
+    if dep is None and dep_walk is None:
+        return (None,None,None,None) # if you can neither walk nor take a transport
+    elif dep is None:
+        return (dep_walk,arr_walk,'walk','walk') # if you can only walk
+    elif dep_walk is None:
+        return (dep,arr,tid,line) # if you can only take a transport
+    else:
+        return (dep,arr,tid,line) if (dep>=dep_walk) else (dep_walk,arr_walk,'walk','walk') # if you can walk or ride, do the fastest
+    
+def shortest_path_reverse(models, walking_network, stations, source, destination, arrival_time):
+    '''
+    Compute the shortest path between destination and source using Dijksta's algorithm
+    models: contains 7 networks, one for each day of the week. They can be generated using model_network()
+    source, destination: station IDs
+    '''
+    edges = build_reverse_network(models[arrival_time.weekday()]) # get the network for the correct day of the week
+    Q = set(stations.keys()) # deep copy
+    dist = dict.fromkeys(Q, datetime.min) # distances to the source (= departure time at each node)
+    prev = dict.fromkeys(Q, (None, None, None, None, None)) # (previous node, dep/arr times, trip_id, line) in the shortest path
+    dist[destination] = arrival_time
+    
+    while Q:
+        unvisited_dist = {key: dist[key] for key in Q} # distances of unvisited nodes
+        u = max(unvisited_dist, key=unvisited_dist.get) # u <- vertex in Q with maximum dist[u]
+        #print('current node ',u)
+        
+        if dist[u] == datetime.min:
+            raise Exception('Only nodes with infinity distance in the queue. The graph is disconected')
+        
+        Q.remove(u) #remove u from Q
+        
+        # if this is the source node, we can terminate
+        if u == source:
+            path = []
+            # reconstruct the shortest path
+            while prev[u][0] != destination:
+                assert(prev[u][0] is not None),'no path from ' + stations[source].name + ' to ' + stations[destination].name
+                assert(len(path) < 300), 'Path has more than 300 hops, something is wrong ...'
+                current_edge = (u,prev[u][0],prev[u][1],prev[u][2],prev[u][3],prev[u][4])
+                path.append(current_edge)
+                u = prev[u][0] # get previous node
+            current_edge = (prev[u][0],u,prev[u][1],prev[u][2],prev[u][3],prev[u][4])
+            path.append(current_edge)
+            return path
+        
+        current_time = dist[u]
+        neighbors = set(edges[u].keys()) if u in edges else set() # u's neighbors by vehicule
+        walk_neighbors = set(walking_network[u].keys())
+        for v in neighbors.union(walk_neighbors):
+            # take the first correspondance. dep is the departure time from v and arr the arrival time at u
+            (dep_time,arr_time,tid,line) = get_next_correspondance_reverse(edges, current_time, walking_network, u, v, prev[u][3])
+            # there is no more correspondance for this edge
+            if dep_time is None:
+                continue
+            dist_u_v = arr_time - dep_time # travelling time from v to u
+            waiting_time = current_time -  arr_time # waiting time after your arrival at u
+            dep_v = current_time - waiting_time - dist_u_v # determine at what time you left v for u
+            # a shorter path to v has been found
+            if dep_v > dist[v]:
+                dist[v] = dep_v
+                prev[v] = (u,dep_time,arr_time,tid,line)
+            
+    raise Exception('No path was found from source to destination')
+    
+def build_reverse_network(network):
+    '''
+    reverts all the edges in the network
+    '''
+    reverse_net = dict()
+    for source in network.keys():
+        for dest in network[source].keys():
+            if not dest in reverse_net.keys():
+                reverse_net[dest] = dict()
+            reverse_net[dest][source] = network[source][dest]
+    return reverse_net
     
 
 #######################################################################
