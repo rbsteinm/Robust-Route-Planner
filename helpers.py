@@ -15,7 +15,7 @@ import numpy as np
 import pickle
 import spark_helpers
 import functools
-
+import copy
 
 #######################################################################
 #______________________________ HELPERS _______________________________
@@ -56,21 +56,25 @@ def load_metadata():
         stations = pickle.load(handle)
     return stations
 
+
 def reduce_path(path):
-    res = []
-    previous_edge = path[0]
-    first_edge = path[0]
-    #first_stop, first_stop_dep = path[0][0], path[0][2]
-    length = 0 # number of hops of this subpath
-    for (i, edge) in enumerate(path):
-        length += 1
-        # if we change bus or it's the last hop of the path
-        if edge[5] != previous_edge[5] or i+1 == len(path):
-            res.append((first_edge[0], previous_edge[1], first_edge[2],previous_edge[3], previous_edge[5], length))
-            length = 0
-            first_edge = edge
-        previous_edge = edge
-    return res
+    all_rides = []
+    current_ride = []
+    i = 0
+    prev_line = None
+    while(i < len(path)):
+        current_line = path[i][5]
+        if current_line != prev_line:
+            all_rides.append(current_ride)
+            current_ride = [path[i]]
+        else:
+            current_ride.append(path[i])
+        prev_line = current_line
+        i += 1
+    # append last ride
+    all_rides.append(current_ride)
+    return [(ride[0][0],ride[-1][1], ride[0][2], ride[-1][3], ride[0][5], len(ride)) for ride in all_rides if len(ride) > 0]
+            
 
 def reduced_path_tostring(red_path, stations):
     for path in red_path:
@@ -82,6 +86,52 @@ def reduced_path_tostring(red_path, stations):
         text = 'line ' + str(line) + ' from ' + stop_a + ' to ' + stop_b + ' '
         text += time_a + ' -> ' + time_b + '(' + str(path[5]) + ' stops)'
         print(text)
+
+
+def reduced_path_to_json(l):
+    d = {}
+    for i in range(len(l)):
+        subpath = {
+            'source': str(l[i][0]),
+            'dest': str(l[i][1]),
+            'dep_time': l[i][2].strftime("%Y-%m-%d %H:%M"),
+            'arr_time': l[i][3].strftime("%Y-%m-%d %H:%M"),
+            'line': l[i][4],
+            'nhops': str(l[i][5]),
+        }
+        d[i] = subpath
+    return d
+
+def to_typical_day(date):
+    '''
+    puts any date in the range 15.01.18-21.01.18 according to its weekday
+    this allows to run the shortest path alg. with correct schedules
+    '''
+    typical_week = ['2018-01-' + str(x) + ' ' + date.strftime("%H:%M:%S") for x in range(15, 22)]
+    typical_week = [str_to_date(x) for x in typical_week]
+    return typical_week[date.weekday()]
+
+def edge_to_typical_day(e):
+    return (e[0],e[1], to_typical_day(e[2]), to_typical_day(e[3]),e[4],e[5])
+
+def back_to_original_date(path, date):
+    '''
+    changes the day and month of each datetime object in the path
+    they were changed previously for the shortest path, this function puts them back
+    to their original values
+    date: the original date
+    '''
+    month = date.month
+    day = date.day
+    res_path = []
+    for p in path:
+        res_path.append((p[0],p[1],p[2].replace(month=month,day=day),p[3].replace(month=month,day=day),p[4],p[5]))
+    return res_path
+
+def compute_path_time(path):
+    t1 = path[0][2]
+    t2 = path[-1][3]
+    return t2 - t1
             
             
 #######################################################################
@@ -193,6 +243,8 @@ def shortest_path(models, walking_network, stations, source, destination, depart
     models: contains 7 networks, one for each day of the week. They can be generated using model_network()
     source, destination: station IDs
     '''
+    original_date = departure_time
+    departure_time = to_typical_day(departure_time)
     edges = models[departure_time.weekday()] # get the network for the correct day of the week
     Q = set(stations.keys()) # deep copy
     dist = dict.fromkeys(Q, datetime.max) # distances to the source (= arrival time at each node)
@@ -220,7 +272,7 @@ def shortest_path(models, walking_network, stations, source, destination, depart
                 u = prev[u][0] # get previous node
             current_edge = (prev[u][0],u,prev[u][1],prev[u][2],prev[u][3],prev[u][4])
             path.insert(0,current_edge) # push the source at the beginning of the path
-            return path
+            return back_to_original_date(path, original_date)
         
         current_time = dist[u]
         neighbors = set(edges[u].keys()) if u in edges else set() # u's neighbors by vehicule
@@ -240,6 +292,125 @@ def shortest_path(models, walking_network, stations, source, destination, depart
                 prev[v] = (u,dep_time,arr_time,tid,line)
             
     raise Exception('No path was found from source to destination')
+    
+    
+#######################################################################
+#_______________________ REVERSE SHORTEST PATH ________________________
+#######################################################################
+
+def get_next_correspondance_reverse(edges, current_time, walking_network, source, dest, prev_tid):
+    """
+    returns departure/arrival times of the first ride departing after the current time
+    assumes that the list current_time is sorted according to departure times!
+    prev_tid: trip_id of the edge that led to source. Allows us to check if there is a change of bus at dest,
+    in which case we will add one minute to the current time to take changing time into account
+    
+    Here since we are in reverse:
+    - we follow the reverse edge from u to v
+    - original edges goes v -> u, or dest -> source
+    - source==u and dest==v
+    - dep is the time at which you leave v and arr is the time at which you arrive at u
+    """
+    tid, line = None,None
+    # if the edge exists for the rides (here source is v and dest is u)
+    if source in edges and dest in edges[source]:
+        times = edges[source][dest] # list of schedules form source to destinations
+        # index of the fist ride arriving before the current time
+        index = np.searchsorted([x[1] for x in times], current_time) - 1
+        # None if there is no ride that can make you arrive at this time
+        (dep,arr,tid,line) = times[index] if index >= 0 else (None,None,None,None)
+        # If you have less than one minute for a change of vehicule, that's not acceptable
+        # add 60 second to the current time and seach again for the next correspondance
+        if tid is not None and prev_tid!=tid and current_time==arr:
+            index = np.searchsorted([x[1] for x in times], current_time-timedelta(seconds=60)) - 1
+            (dep,arr,tid,line) = times[index] if index >= 0 else (None,None,None,None)
+    else:
+        (dep,arr) = (None,None) # None if there is no edge by vehicule
+        
+    # determine if you can reach dest from source by foot
+    if source in walking_network and dest in walking_network[source]:
+        walk_time = walking_network[source][dest]
+        (dep_walk,arr_walk) = (current_time-walk_time,current_time)
+    else:
+        (dep_walk,arr_walk) = (None,None)
+    
+    if dep is None and dep_walk is None:
+        return (None,None,None,None) # if you can neither walk nor take a transport
+    elif dep is None:
+        return (dep_walk,arr_walk,'walk','walk') # if you can only walk
+    elif dep_walk is None:
+        return (dep,arr,tid,line) # if you can only take a transport
+    else:
+        return (dep,arr,tid,line) if (dep>=dep_walk) else (dep_walk,arr_walk,'walk','walk') # if you can walk or ride, do the fastest
+    
+def shortest_path_reverse(models, walking_network, stations, source, destination, arrival_time):
+    '''
+    Compute the shortest path between destination and source using Dijksta's algorithm
+    models: contains 7 networks, one for each day of the week. They can be generated using model_network()
+    source, destination: station IDs
+    '''
+    original_date = arrival_time
+    arrival_time = to_typical_day(arrival_time)
+    edges = build_reverse_network(models[arrival_time.weekday()]) # get the network for the correct day of the week
+    Q = set(stations.keys()) # deep copy
+    dist = dict.fromkeys(Q, datetime.min) # distances to the source (= departure time at each node)
+    prev = dict.fromkeys(Q, (None, None, None, None, None)) # (previous node, dep/arr times, trip_id, line) in the shortest path
+    dist[destination] = arrival_time
+    
+    while Q:
+        unvisited_dist = {key: dist[key] for key in Q} # distances of unvisited nodes
+        u = max(unvisited_dist, key=unvisited_dist.get) # u <- vertex in Q with maximum dist[u]
+        #print('current node ',u)
+        
+        if dist[u] == datetime.min:
+            raise Exception('Only nodes with infinity distance in the queue. The graph is disconected')
+        
+        Q.remove(u) #remove u from Q
+        
+        # if this is the source node, we can terminate
+        if u == source:
+            path = []
+            # reconstruct the shortest path
+            while prev[u][0] != destination:
+                assert(prev[u][0] is not None),'no path from ' + stations[source].name + ' to ' + stations[destination].name
+                assert(len(path) < 300), 'Path has more than 300 hops, something is wrong ...'
+                current_edge = (u,prev[u][0],prev[u][1],prev[u][2],prev[u][3],prev[u][4])
+                path.append(current_edge)
+                u = prev[u][0] # get previous node
+            current_edge = (prev[u][0],u,prev[u][1],prev[u][2],prev[u][3],prev[u][4])
+            path.append(current_edge)
+            return back_to_original_date(path, original_date)
+        
+        current_time = dist[u]
+        neighbors = set(edges[u].keys()) if u in edges else set() # u's neighbors by vehicule
+        walk_neighbors = set(walking_network[u].keys())
+        for v in neighbors.union(walk_neighbors):
+            # take the first correspondance. dep is the departure time from v and arr the arrival time at u
+            (dep_time,arr_time,tid,line) = get_next_correspondance_reverse(edges, current_time, walking_network, u, v, prev[u][3])
+            # there is no more correspondance for this edge
+            if dep_time is None:
+                continue
+            dist_u_v = arr_time - dep_time # travelling time from v to u
+            waiting_time = current_time -  arr_time # waiting time after your arrival at u
+            dep_v = current_time - waiting_time - dist_u_v # determine at what time you left v for u
+            # a shorter path to v has been found
+            if dep_v > dist[v]:
+                dist[v] = dep_v
+                prev[v] = (u,dep_time,arr_time,tid,line)
+            
+    raise Exception('No path was found from source to destination')
+    
+def build_reverse_network(network):
+    '''
+    reverts all the edges in the network
+    '''
+    reverse_net = dict()
+    for source in network.keys():
+        for dest in network[source].keys():
+            if not dest in reverse_net.keys():
+                reverse_net[dest] = dict()
+            reverse_net[dest][source] = network[source][dest]
+    return reverse_net
     
 
 #######################################################################
@@ -274,6 +445,7 @@ def get_reachable_stations(network, walking_network, source):
             neighbors = get_neighbors(network, walking_network, node)
             queue.extend(neighbors - visited)
     return visited
+
 
 #######################################################################
 #______________________ UNCERTAINTY PROBABILITY  ______________________
@@ -310,9 +482,9 @@ def routing_algo(path, delay_distribution_pd):
                 inter = search_inter(prev_edge[4], spark_helpers.group_weekday_py(edge[3].weekday()), time_inter, delay_distribution_pd)
             
             if inter:
-                certainty[i-1] = min(time_for_change.total_seconds() / inter, 1)
+                certainty[i] = min(time_for_change.total_seconds() / inter, 1)
             else:
-                certainty[i-1] = 1
+                certainty[i] = 1
         prev_edge = edge
         
         if certainty:
@@ -321,6 +493,70 @@ def routing_algo(path, delay_distribution_pd):
             certainty_tot = 1
             
     return certainty, certainty_tot
+
+
+#######################################################################
+#_____________________ GENERATE ALTERNATIVE PATHS  ____________________
+#######################################################################
+
+
+def remove_worst_edge(network, uncertainies, path):
+    '''
+    removes the worst edge from the network and returns it
+    returns None if the network is already good enough (total uncertainty >= threshold)
+    '''
+    if uncertainies[1] == 1:
+        return network
+    index = min(uncertainies[0], key=uncertainies[0].get)
+    edge = path[index]
+    return remove_edge(edge, network)
+    
+    
+def remove_edge(e, net):
+    '''
+    returns a deep copy of the network and removes the edge e.
+    Warning, this methods removes an edge INPLACE
+    '''
+    e = edge_to_typical_day(e)
+    net[e[0]][e[1]].remove(e[2:])
+    return net
+
+
+def safest_paths(models, walking_network, stations, source, dest, date, delay_distribution, n_iters=100, threshold=0.8, n_paths=4):
+    '''
+    tries to compute new shortest paths by iteratively removing the most risky edge of the network
+    and recomputing a shortest path from the reduced network.
+    Note that we do not remove an entire edge, but just a single row of this edge's schedule.
+    '''
+    # do a deepcopy of the network we need
+    my_net = copy.deepcopy(models[date.weekday()])
+    my_models = [None]*7
+    my_models[date.weekday()] = my_net
+    all_paths = []
+    i = 0
+    while(i < n_iters):
+        print(i+1, '/', n_iters)
+        sp = shortest_path(my_models, walking_network, stations, source, dest, date)
+        uncertainies = routing_algo(sp, delay_distribution)
+        path_safety = uncertainies[1] # safety of the entire path, [0,1]
+        all_paths.append((sp, uncertainies))
+        # stop iterating if the path is safe enough
+        if path_safety >= threshold:
+            break
+        my_net = remove_worst_edge(my_net, uncertainies, sp)
+        my_models[date.weekday()] = my_net
+        i += 1
+    # get the shortest path and the n_paths-1 safest paths
+    results = [all_paths.pop(0)]
+    
+    for i in range(n_paths-1):
+        safest_path = max(all_paths, key=lambda item: item[1][1])
+        results.append(safest_path)
+        all_paths.remove(safest_path)
+        if len(all_paths) == 0:
+            break
+    return results
+    
 
 #######################################################################
 #______________________ BOKEH MAP VISUALIZATION  ______________________
