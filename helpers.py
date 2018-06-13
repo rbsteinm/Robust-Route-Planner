@@ -42,24 +42,6 @@ def load_metadata():
         stations = pickle.load(handle)
     return stations
 
-'''def reduce_path(path):
-    res = []
-    previous_edge = path[0]
-    first_edge = path[0]
-    #first_stop, first_stop_dep = path[0][0], path[0][2]
-    length = 0 # number of hops of this subpath
-    for (i, edge) in enumerate(path):
-        length += 1
-        # if we change bus or it's the last hop of the path
-        if edge[5] != previous_edge[5] or i+1 == len(path):
-            if(i+1==len(path)):
-               print('last')
-            res.append((first_edge[0], previous_edge[1], first_edge[2],previous_edge[3], previous_edge[5], length))
-            length = 0
-            first_edge = edge
-        previous_edge = edge
-    return res'''
-
 
 def reduce_path(path):
     all_rides = []
@@ -105,6 +87,15 @@ def reduced_path_to_json(l):
         }
         d[i] = subpath
     return d
+
+def to_typical_day(date):
+    '''
+    puts any date in the range 15.01.18-21.01.18 according to its weekday
+    this allows to run the shortest path alg. with correct schedules
+    '''
+    typical_week = ['2018-01-' + str(x) + ' ' + date.strftime("%H:%M:%S") for x in range(15, 22)]
+    typical_week = [str_to_date(x) for x in typical_week]
+    return typical_week[date.weekday()]
             
             
 #######################################################################
@@ -216,6 +207,7 @@ def shortest_path(models, walking_network, stations, source, destination, depart
     models: contains 7 networks, one for each day of the week. They can be generated using model_network()
     source, destination: station IDs
     '''
+    departure_time = to_typical_day(departure_time)
     edges = models[departure_time.weekday()] # get the network for the correct day of the week
     Q = set(stations.keys()) # deep copy
     dist = dict.fromkeys(Q, datetime.max) # distances to the source (= arrival time at each node)
@@ -320,6 +312,7 @@ def shortest_path_reverse(models, walking_network, stations, source, destination
     models: contains 7 networks, one for each day of the week. They can be generated using model_network()
     source, destination: station IDs
     '''
+    arrival_time = to_typical_day(arrival_time)
     edges = build_reverse_network(models[arrival_time.weekday()]) # get the network for the correct day of the week
     Q = set(stations.keys()) # deep copy
     dist = dict.fromkeys(Q, datetime.min) # distances to the source (= departure time at each node)

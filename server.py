@@ -12,9 +12,15 @@ app = Flask(__name__)
 stations = helpers.load_metadata()
 models = helpers.load_networks()
 walking_network = helpers.compute_walking_network(stations)
+ZH_HB = 8503000
+
+reachable_stations_ids = helpers.get_reachable_stations(models[0], walking_network, ZH_HB)
+reachable_stations = {sid: stations[sid] for sid in reachable_stations_ids}
 
 @app.route('/')
 def index():
+    test = helpers.shortest_path(models,walking_network,stations,ZH_HB, 8502559, datetime(2018, 1, 15, 14, 0))
+    print(test)
     return render_template('index.html',name=None)
     return page
     for path in y:
@@ -29,7 +35,7 @@ def index():
 
 @app.route('/get_stations')
 def get_stations():
-    return jsonify({str(key): stations[key] for key in stations.keys()})
+    return jsonify({str(key): reachable_stations[key] for key in reachable_stations.keys()})
 
 @app.route('/receiver', methods = ['POST'])
 def worker():
@@ -37,8 +43,9 @@ def worker():
     data = request.get_json()
     print(request.get_json())
     date = data['date']
+    print(date)
     destination = int(data['station'])
-    x = helpers.shortest_path(models,walking_network,stations,8503000, destination, datetime(int(date['year']), int(date['month']), int(date['day']), int(date['hour']),int(date['minute'])))
+    x = helpers.shortest_path(models,walking_network,stations,ZH_HB, destination, datetime(int(date['year']), int(date['month']), int(date['day']), int(date['hour']),int(date['minute'])))
     y = helpers.reduce_path(x)
     print(helpers.reduced_path_to_json(y))
     #print(y)
