@@ -41,13 +41,14 @@ def get_stations():
 def worker():
     # read json + reply
     data = request.get_json()
-    print(request.get_json())
     date = data['date']
-    print(date)
+    reverse = (data['dep'] == 'arr')
     destination = int(data['station'])
-    x = helpers.shortest_path(models,walking_network,stations,ZH_HB, destination, datetime(int(date['year']), int(date['month']), int(date['day']), int(date['hour']),int(date['minute'])))
+    if not reverse:
+        x = helpers.shortest_path(models,walking_network,stations,ZH_HB, destination, datetime(int(date['year']), int(date['month']), int(date['day']), int(date['hour']),int(date['minute'])))
+    else:
+        x = helpers.shortest_path_reverse(models,walking_network,stations,ZH_HB, destination, datetime(int(date['year']), int(date['month']), int(date['day']), int(date['hour']),int(date['minute'])))
     y = helpers.reduce_path(x)
-    print(helpers.reduced_path_to_json(y))
     #print(y)
     #return render_template('test.html', name=None)
     return jsonify(result={'data':helpers.reduced_path_to_json(y)})
