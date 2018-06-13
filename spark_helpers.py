@@ -67,7 +67,7 @@ def rush_inter(date):
     else:
         return 1
     
-create_rush = udf(rush_inter)
+create_rush = functions.udf(rush_inter)
     
 @functions.udf
 def create_interval(date):
