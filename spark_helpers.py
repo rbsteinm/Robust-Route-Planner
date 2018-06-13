@@ -47,3 +47,88 @@ def edge_is_valid(tid, time, sid, stop_type, next_tid, next_time, next_sid, next
     # to fix this issue, we consider that if a trip is longer than 10 hours, it can be discarded
     duration = (datetime.strptime(next_time, '%Y-%m-%d %H:%M:%S') - datetime.strptime(time, '%Y-%m-%d %H:%M:%S')).total_seconds()/3600
     return (time <= next_time and tid == next_tid and stop_type!='last' and next_stop_type!='first' and duration < 10 and dep <= next_arr)
+
+@functions.udf
+def keep_time(date):
+    """
+    Keep only the time and not the day for a date
+    """
+    return date.split(' ')[1]
+
+def rush_inter(date):
+    """
+    Create time intervals, in order to group the trip in the same schedule.
+    We decided to create two buckets of time, during the rush hours 
+    (at the start and end of the work day : 6h/9h and 17h/19h)
+    and the rest of the day.
+    """
+    if (date >= '06:00:00' and date <= '09:00:00') or (date >= '17:00:00' and date <= '19:00:00'):
+        return 0
+    else:
+        return 1
+    
+create_rush = udf(rush_inter)
+    
+@functions.udf
+def create_interval(date):
+    """
+    Create more specific time intervals, separate the day in 6 time buckets.
+    """
+    if (date >= '00:00:00' and date < '06:00:00'):
+        return 0
+    elif (date >= '06:00:00' and date < '09:00:00'):
+        return 1
+    elif (date >= '09:00:00' and date < '13:00:00'):
+        return 2
+    elif (date >= '13:00:00' and date < '16:00:00'):
+        return 3
+    elif (date >= '16:00:00' and date < '19:00:00'):
+        return 4
+    else:
+        return 5
+    
+def group_weekday_py(weekday):
+    """
+    Separate the day of the week in 4 buckets:
+    - Wednesnay, Saturday and Sunday separatly
+    - Monday, Tuesday, Thursday and Friday together
+    """
+    if weekday == 2:
+        return 1
+    elif weekday == 5:
+        return 2
+    elif weekday == 6:
+        return 3
+    else:
+        return 0
+    
+group_weekday = functions.udf(group_weekday_py)
+    
+@functions.udf
+def delete_neg(distri):
+    """
+    Remplace negative values by 0
+    """
+    return [0 if d < 0 else d for d in distri]
+
+@functions.udf
+def iqm(distri):
+    """
+    Compute the interquartile mean (IQM)
+    """
+    s = len(distri)
+    lp = s/4 + 1
+    lm = 3*s/4
+    f = 0
+    for i,x in enumerate(sorted(distri)):
+        if lp <= i <= lm:
+            f += x
+    return 2/s * f
+
+@functions.udf
+def interquartile(distri):
+    """
+    Compute the interquartile range (IQR)
+    """
+    q1, q3 = np.percentile(distri, [25, 75])
+    return float(q3) - float(q1)
