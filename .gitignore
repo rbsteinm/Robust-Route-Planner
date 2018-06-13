@@ -102,3 +102,7 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+#pickle file
+full_delay_distri.pickle
+stat_comp.pickle
