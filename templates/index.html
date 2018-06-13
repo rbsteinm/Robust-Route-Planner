@@ -17,7 +17,7 @@
             color: rgb(120, 120, 120);
         }
         #search_results_container{
-            background-color: rgba(200, 200, 200, 0.2);
+            background-color: rgba(240, 240, 240, 1);
             border: 0px hidden rgba(195, 195, 195, 1);
             border-radius: 10px;
             //border: 1px solid rgb(200, 200, 200);
@@ -29,8 +29,6 @@
             outline: 0;
             padding: 12px 20px 12px 30px;
             border-radius: 10px;
-            font-size: 16px;
-            color: #0D1319;
         }
 
         #destination{
@@ -91,8 +89,8 @@
 
         #path{
             position: absolute;
-            width: 80%;
-            left: 10%;
+            width: 60%;
+            left: 5%;
             top: 30%;
             font-size: x-large;
         }
@@ -112,6 +110,10 @@
             text-align: center;
             vertical-align: middle;
             line-height: 69px;
+        }
+
+        td{
+            padding-bottom: 10px;
         }
 
         /*input[type=text]:focus {
@@ -144,6 +146,24 @@
 
 
     <script type="text/javascript">
+
+    d3.select('#dest_searchbox').on('mouseover', function(d){
+        d3.select(this).style('border-color', 'rgb(100, 100, 100)');
+    }).on('mouseout', function(d){
+        d3.select(this).style('border-color', 'rgb(200, 200, 200)');
+    });
+
+    d3.select('#submit_button').on('mouseover', function(d){
+        d3.select(this).style('border-color', 'rgb(100, 100, 100)');
+    }).on('mouseout', function(d){
+        d3.select(this).style('border-color', 'rgb(200, 200, 200)');
+    });
+
+    d3.select('#datepicker').on('mouseover', function(d){
+        d3.select(this).style('border-color', 'rgb(100, 100, 100)');
+    }).on('mouseout', function(d){
+        d3.select(this).style('border-color', 'rgb(200, 200, 200)');
+    });
 
     var stations;
     var selected_station = 8591436;
@@ -178,6 +198,7 @@
                 'minute':start.minute()
             };
             console.log(res);
+            selected_date = res;
             return res;
         });
 
@@ -241,7 +262,6 @@
         }).on('mouseout', function (d) {
             d3.select(this).style('background-color', 'transparent').style('cursor', 'default');
         }).text(function (d) {
-            console.log(d)
             return stations[d]['name'];
         });
 
@@ -250,7 +270,6 @@
 
     function display_path(path){
         d3.selectAll('.subpath').remove();
-        console.log(Object.keys(path));
         var subpaths = d3.select('#path').selectAll('.subpath').data(Object.keys(path), function(key){
             return key;
         });

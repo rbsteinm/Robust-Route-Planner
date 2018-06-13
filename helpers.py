@@ -96,6 +96,20 @@ def to_typical_day(date):
     typical_week = ['2018-01-' + str(x) + ' ' + date.strftime("%H:%M:%S") for x in range(15, 22)]
     typical_week = [str_to_date(x) for x in typical_week]
     return typical_week[date.weekday()]
+
+def back_to_original_date(path, date):
+    '''
+    changes the day and month of each datetime object in the path
+    they were changed previously for the shortest path, this function puts them back
+    to their original values
+    date: the original date
+    '''
+    month = date.month
+    day = date.day
+    res_path = []
+    for p in path:
+        res_path.append((p[0],p[1],p[2].replace(month=month,day=day),p[3].replace(month=month,day=day),p[4],p[5]))
+    return res_path
             
             
 #######################################################################
@@ -207,6 +221,7 @@ def shortest_path(models, walking_network, stations, source, destination, depart
     models: contains 7 networks, one for each day of the week. They can be generated using model_network()
     source, destination: station IDs
     '''
+    original_date = departure_time
     departure_time = to_typical_day(departure_time)
     edges = models[departure_time.weekday()] # get the network for the correct day of the week
     Q = set(stations.keys()) # deep copy
@@ -235,7 +250,7 @@ def shortest_path(models, walking_network, stations, source, destination, depart
                 u = prev[u][0] # get previous node
             current_edge = (prev[u][0],u,prev[u][1],prev[u][2],prev[u][3],prev[u][4])
             path.insert(0,current_edge) # push the source at the beginning of the path
-            return path
+            return back_to_original_date(path, original_date)
         
         current_time = dist[u]
         neighbors = set(edges[u].keys()) if u in edges else set() # u's neighbors by vehicule
@@ -312,6 +327,7 @@ def shortest_path_reverse(models, walking_network, stations, source, destination
     models: contains 7 networks, one for each day of the week. They can be generated using model_network()
     source, destination: station IDs
     '''
+    original_date = arrival_time
     arrival_time = to_typical_day(arrival_time)
     edges = build_reverse_network(models[arrival_time.weekday()]) # get the network for the correct day of the week
     Q = set(stations.keys()) # deep copy
@@ -341,7 +357,7 @@ def shortest_path_reverse(models, walking_network, stations, source, destination
                 u = prev[u][0] # get previous node
             current_edge = (prev[u][0],u,prev[u][1],prev[u][2],prev[u][3],prev[u][4])
             path.append(current_edge)
-            return path
+            return back_to_original_date(path, original_date)
         
         current_time = dist[u]
         neighbors = set(edges[u].keys()) if u in edges else set() # u's neighbors by vehicule
