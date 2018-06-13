@@ -132,3 +132,11 @@ def interquartile(distri):
     """
     q1, q3 = np.percentile(distri, [25, 75])
     return float(q3) - float(q1)
+
+@functions.udf
+def get_longitude(station_id):
+    return float(pandas_df[pandas_df['station_ID'] == station_id].long.values[0])
+
+@functions.udf
+def get_latitude(station_id):
+    return float(pandas_df[pandas_df['station_ID'] == station_id].lat.values[0])
