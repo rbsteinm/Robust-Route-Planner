@@ -49,6 +49,7 @@
             border: 1px solid rgb(200, 200, 200);
             border-radius: 10px;
             outline: 0;
+            color: rgb(120, 120, 120);
         }
 
         #departure{
@@ -70,6 +71,7 @@
             border-radius: 10px;
             outline: 0;
             cursor: not-allowed;
+            color: rgb(120, 120, 120);
         }
 
         #datepicker{
@@ -85,6 +87,7 @@
             border-radius: 10px;
             outline: 0;
             cursor: pointer;
+            color: rgb(120, 120, 120);
         }
 
 
@@ -112,6 +115,10 @@
             font-size: x-large;
         }
 
+        table{
+            width: 100%;
+        }
+
         #submit_button{
             font-size: x-large;
             height: 69px;
@@ -136,6 +143,12 @@
         img{
             width: 10%;
             position: absolute;
+        }
+
+        .table-header{
+            padding-bottom: 15px;
+            font-size: 20px;
+            color: rgb(60, 60, 60);
         }
 
         /*input[type=text]:focus {
@@ -169,7 +182,7 @@
     </div>
     <div id="submit_button">Search</div>
 
-    <table id='path'></table>
+    <div id='path'></div>
 
 
     <script type="text/javascript">
@@ -195,7 +208,8 @@
     });
 
     var stations;
-    var selected_station = 8591436;
+    //var selected_station = 8591436;
+    var selected_station = 8587978;
     var selected_date = {
                 'year':'2018',
                 'month': '1',
@@ -249,8 +263,8 @@
                 contentType: 'application/json',
                 asynch: false,
                 data: JSON.stringify({'date':selected_date, 'station':selected_station, 'dep':$("input[name=dep_arr]:checked").val()}), 
-            }).done(function(path){
-                display_path(path['result']['data']);
+            }).done(function(paths){
+                display_paths(paths['result']);
             }).fail(function(jqXHR, textStatus, error){
                 console.log('error: ' + textStatus)
             });
@@ -296,18 +310,22 @@
         cells.exit().remove();
     }
 
-    function display_path(path){
-        d3.selectAll('.subpath').remove();
-        var subpaths = d3.select('#path').selectAll('.subpath').data(Object.keys(path), function(key){
-            return key;
+    function display_paths(paths){
+        console.log(paths);
+        var path = d3.select('#path');
+        path.selectAll('*').remove();
+        Object.keys(paths).forEach(function(p){
+            console.log(paths[p]);
+            path.append('div').attr('class', 'table-header').text('#' + String(parseInt(p)+1) + '  Duration: ' + time_to_string(paths[p]['time']) + ',  safety: ' + paths[p]['safety'] + '%');
+            var subpaths = path.append('table').selectAll('.subpath').data(Object.keys(paths[p]['path']), function(key){
+                return key;
+            });
+            subpaths.enter().append('tr').attr('class', 'subpath').html(function(d){
+                return path_row(paths[p]['path'][d]);
+            });
+            path.append('br');
+            
         });
-
-        subpaths.enter().append('tr').attr('class', 'subpath').html(function(d){
-            return path_row(path[d]);
-        });
-
-        //subpaths.exit().remove();
-        console.log('path displayed');
     }
 
     function get_name(station_id){
@@ -320,13 +338,28 @@
 
     function path_row(subpath){
         text = '';
-        text = text + '<td>' + get_time(subpath['dep_time']) + '</td>';
-        text = text + '<td>' + get_name(subpath['source']) + '</td>';
-        text = text + '<td>' + get_time(subpath['arr_time']) + '</td>';
-        text = text + '<td>' + get_name(subpath['dest']) + '</td>';
-        text = text + '<td>' + subpath['line'] + '</td>';
-        text = text + '<td>' + subpath['nhops'] + '</td>';
+        text = text + '<td width="6%">' + get_time(subpath['dep_time']) + '</td>';
+        text = text + '<td width="40%">' + get_name(subpath['source']) + '</td>';
+        text = text + '<td width="6%">' + get_time(subpath['arr_time']) + '</td>';
+        text = text + '<td width="40%">' + get_name(subpath['dest']) + '</td>';
+        text = text + '<td width="6%">' + subpath['line'] + '</td>';
+        text = text + '<td width="5%">' + subpath['nhops'] + '</td>';
         return text;
+    }
+
+    function time_to_string(t){
+        var time = t.split(':');
+        var h = time[0];
+        var m = time[1];
+        if(parseInt(h)==0){
+            return m+'mn';
+        }
+        else if(parseInt(m)==0){
+            if(parseInt(h) > 1){return h+' hours';}else{return h+' hour';}
+        }
+        else{
+            return h+'h ' + m + 'mn'
+        }
     }
 
 
