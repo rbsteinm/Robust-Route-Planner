@@ -313,7 +313,7 @@
         path.selectAll('*').remove();
         Object.keys(paths).forEach(function(p){
             console.log(paths[p]);
-            path.append('div').attr('class', 'table-header').text('#' + String(parseInt(p)+1) + '  Duration: ' + time_to_string(paths[p]['time']) + '  Safety: ' + paths[p]['safety'] + '%');
+            path.append('div').attr('class', 'table-header').text('#' + String(parseInt(p)+1) + '  Duration: ' + time_to_string(paths[p]['time']) + ',  safety: ' + paths[p]['safety'] + '%');
             var subpaths = path.append('table').selectAll('.subpath').data(Object.keys(paths[p]['path']), function(key){
                 return key;
             });
@@ -349,10 +349,13 @@
         var h = time[0];
         var m = time[1];
         if(parseInt(h)==0){
-            return m+' min';
+            return m+'mn';
+        }
+        else if(parseInt(m)==0){
+            if(parseInt(h) > 1){return h+' hours';}else{return h+' hour';}
         }
         else{
-            return h+' h and ' + m + ' min'
+            return h+'h ' + m + 'mn'
         }
     }
 

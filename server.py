@@ -38,7 +38,7 @@ def worker():
         #x = helpers.safest_paths(models, walking_network, reachable_stations, ZH_HB, 8591436, datetime(2018, 1, 15, 14), delay_distribution_pd)
         paths = helpers.safest_paths(models,walking_network,reachable_stations,ZH_HB, destination, datetime(int(date['year']), int(date['month']), int(date['day']), int(date['hour']),int(date['minute'])), delay_distribution_pd)
     else:
-        paths = helpers.shortest_path_reverse(models,walking_network,reachable_stations,ZH_HB, destination, datetime(int(date['year']), int(date['month']), int(date['day']), int(date['hour']),int(date['minute'])))
+        paths = helpers.safest_paths(models,walking_network,reachable_stations,ZH_HB, destination, datetime(int(date['year']), int(date['month']), int(date['day']), int(date['hour']),int(date['minute'])), delay_distribution_pd, reverse=True)
     res = dict()
     for i,x in enumerate(paths):
         res[str(i)] = {'path': helpers.reduced_path_to_json(helpers.reduce_path(x[0])), 'safety': round(100*x[1][1]), 'time':str(helpers.compute_path_time(x[0]))}

@@ -546,7 +546,7 @@ def remove_edge(e, net):
     return net
 
 
-def safest_paths(models, walking_network, stations, source, dest, date, delay_distribution, n_iters=100, threshold=0.8, n_paths=4):
+def safest_paths(models, walking_network, stations, source, dest, date, delay_distribution, n_iters=100, threshold=0.8, n_paths=4, reverse=False):
     '''
     tries to compute new shortest paths by iteratively removing the most risky edge of the network
     and recomputing a shortest path from the reduced network.
@@ -560,7 +560,10 @@ def safest_paths(models, walking_network, stations, source, dest, date, delay_di
     i = 0
     while(i < n_iters):
         print(i+1, '/', n_iters)
-        sp = shortest_path(my_models, walking_network, stations, source, dest, date)
+        if reverse:
+            sp = shortest_path_reverse(my_models, walking_network, stations, source, dest, date)
+        else: 
+            sp = shortest_path(my_models, walking_network, stations, source, dest, date)
         uncertainies = routing_algo(sp, delay_distribution)
         path_safety = uncertainies[1] # safety of the entire path, [0,1]
         all_paths.append((sp, uncertainies))
