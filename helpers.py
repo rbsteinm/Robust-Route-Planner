@@ -13,7 +13,6 @@ from bokeh.plotting import figure, output_file, show, ColumnDataSource
 import time
 import numpy as np
 import pickle
-import spark_helpers
 import functools
 import copy
 
@@ -402,7 +401,7 @@ def shortest_path_reverse(models, walking_network, stations, source, destination
                 current_edge = (u,prev[u][0],prev[u][1],prev[u][2],prev[u][3],prev[u][4])
                 path.append(current_edge)
                 u = prev[u][0] # get previous node
-            current_edge = (prev[u][0],u,prev[u][1],prev[u][2],prev[u][3],prev[u][4])
+            current_edge = (u,prev[u][0],prev[u][1],prev[u][2],prev[u][3],prev[u][4])
             path.append(current_edge)
             return back_to_original_date(path, original_date)
         
@@ -473,7 +472,7 @@ def get_reachable_stations(network, walking_network, source):
 
 
 #######################################################################
-#______________________ UNCERTAINTY PROBABILITY  ______________________
+#______________________ UNCERTAINTY SCORE  ______________________
 #######################################################################
 
 def search_inter(trip_id, weekday, time_interval, delay_distribution_pd):
@@ -489,7 +488,7 @@ def search_inter(trip_id, weekday, time_interval, delay_distribution_pd):
 def routing_algo(path, delay_distribution_pd):
     """
     Take a path and determine the rate of missing each transport change according to the predictive model
-    we built earlier. It returns also the combining probability for the whole path.
+    we built earlier. It returns also the combining ratio for the whole path.
     """
     prev_edge = path[0]
     certainty = {}
@@ -689,7 +688,8 @@ def plot_trip(pandas_df, path):
     p = figure(x_range=(-x_y_offset+zurich_coord[0], x_y_offset+zurich_coord[0]), 
                y_range=(-x_y_offset+zurich_coord[1], x_y_offset+zurich_coord[1]),
                x_axis_type="mercator", 
-               y_axis_type="mercator", tools=[hover, "pan","wheel_zoom","box_zoom","reset"])
+               y_axis_type="mercator", tools=[hover, "pan","wheel_zoom","box_zoom","reset"],
+               plot_width=900, plot_height=600)
 
     p.add_tile(CARTODBPOSITRON)
 
@@ -700,4 +700,61 @@ def plot_trip(pandas_df, path):
 
     p.add_layout(label_set)
 
+    show(p)
+
+#######################################################################
+#______________________ ISOCHRONOUS MAP  ______________________
+#######################################################################    
+    
+    
+def compute_walking_distance(time, walking_speed=5.04):
+    """time in timedeltat format, speed in km/h, returns distance in km"""
+    return (time.total_seconds() / 3600) * walking_speed
+
+def isoch_data(time_to_go, pandas_df, all_paths):
+    """
+    Creates the useful data in order to make the isochronous map 
+    """
+    x = []
+    y = []
+    radius = []
+    
+    for short in all_paths:
+        path_time = compute_path_time(short)
+        if path_time <= time_to_go:
+            remaining_time = time_to_go - path_time
+            walking_dist = compute_walking_distance(remaining_time)
+            
+            long = pandas_df[pandas_df.station_ID == short[-1][1]].long.values[0]
+            lat = pandas_df[pandas_df.station_ID == short[-1][1]].lat.values[0]
+            merc = to_merc(lat, long)
+            
+            x.append(merc[0])
+            y.append(merc[1])
+            radius.append(walking_dist * 1000)
+            
+    return x, y, radius
+
+def isoch(max_time, all_paths, pandas_df):
+    """
+    Draws the isochronous map for the max_time (in minutes)
+    """
+    output_notebook()
+    
+    x,y,radius = isoch_data(timedelta(minutes=max_time), pandas_df, all_paths)
+    source = ColumnDataSource(data=dict(x=x, y=y, rad=radius))
+
+    zurich_coord = to_merc(47.378177, 8.540192)
+    x_y_offset = 8000
+
+    p = figure(x_range=(-x_y_offset+zurich_coord[0], x_y_offset+zurich_coord[0]), 
+               y_range=(-x_y_offset+zurich_coord[1], x_y_offset+zurich_coord[1]),
+               x_axis_type="mercator", 
+               y_axis_type="mercator",
+               plot_width=900, plot_height=600)
+    
+    p.add_tile(CARTODBPOSITRON)
+    
+    p.circle(x="x", y="y", radius="rad", fill_color="#0000FF", source=source, fill_alpha=0.2, line_width = 0.01)
+    p.square(x=[zurich_coord[0]], y=[zurich_coord[1]], fill_color="#FF0000", size=10)
     show(p)
