@@ -133,7 +133,32 @@ def compute_path_time(path):
     t2 = path[-1][3]
     return t2 - t1
             
-            
+def rush_inter(date):
+    """
+    Create time intervals, in order to group the trip in the same schedule.
+    We decided to create two buckets of time, during the rush hours 
+    (at the start and end of the work day : 6h/9h and 17h/19h)
+    and the rest of the day.
+    """
+    if (date >= '06:00:00' and date <= '09:00:00') or (date >= '17:00:00' and date <= '19:00:00'):
+        return 0
+    else:
+        return 1
+
+def group_weekday_py(weekday):
+    """
+    Separate the day of the week in 4 buckets:
+    - Wednesnay, Saturday and Sunday separatly
+    - Monday, Tuesday, Thursday and Friday together
+    """
+    if weekday == 2:
+        return 1
+    elif weekday == 5:
+        return 2
+    elif weekday == 6:
+        return 3
+    else:
+        return 0    
 #######################################################################
 #___________________________ MODEL NETWORK ____________________________
 #######################################################################
@@ -475,11 +500,11 @@ def routing_algo(path, delay_distribution_pd):
             time_for_change = edge[2] - prev_edge[3]
             
             if (prev_edge[4] == 'walk') and (i-1 != 0):      
-                time_inter = spark_helpers.rush_inter(path[i-2][3].time().isoformat())
-                inter = search_inter(path[i-2][4], spark_helpers.group_weekday_py(path[i-2][3].weekday()), time_inter, delay_distribution_pd)
+                time_inter = rush_inter(path[i-2][3].time().isoformat())
+                inter = search_inter(path[i-2][4], group_weekday_py(path[i-2][3].weekday()), time_inter, delay_distribution_pd)
             else:
-                time_inter = spark_helpers.rush_inter(prev_edge[3].time().isoformat())
-                inter = search_inter(prev_edge[4], spark_helpers.group_weekday_py(edge[3].weekday()), time_inter, delay_distribution_pd)
+                time_inter = rush_inter(prev_edge[3].time().isoformat())
+                inter = search_inter(prev_edge[4], group_weekday_py(edge[3].weekday()), time_inter, delay_distribution_pd)
             
             if inter:
                 certainty[i] = min(time_for_change.total_seconds() / inter, 1)
@@ -656,7 +681,7 @@ def plot_trip(pandas_df, path):
     label_set = LabelSet(x='x', y='y', text='names', level='glyph',
                   x_offset=-10, y_offset=10, source=source, render_mode='canvas')
 
-    zurich_coord = to_merc(47.395501, 8.502376)
+    zurich_coord = to_merc(47.378177, 8.540192)
     x_y_offset = 6000
     
     hover = HoverTool(tooltips=[("stop name", "@desc")])

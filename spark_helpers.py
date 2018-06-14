@@ -55,20 +55,6 @@ def keep_time(date):
     """
     return date.split(' ')[1]
 
-def rush_inter(date):
-    """
-    Create time intervals, in order to group the trip in the same schedule.
-    We decided to create two buckets of time, during the rush hours 
-    (at the start and end of the work day : 6h/9h and 17h/19h)
-    and the rest of the day.
-    """
-    if (date >= '06:00:00' and date <= '09:00:00') or (date >= '17:00:00' and date <= '19:00:00'):
-        return 0
-    else:
-        return 1
-    
-create_rush = functions.udf(rush_inter)
-    
 @functions.udf
 def create_interval(date):
     """
@@ -86,23 +72,6 @@ def create_interval(date):
         return 4
     else:
         return 5
-    
-def group_weekday_py(weekday):
-    """
-    Separate the day of the week in 4 buckets:
-    - Wednesnay, Saturday and Sunday separatly
-    - Monday, Tuesday, Thursday and Friday together
-    """
-    if weekday == 2:
-        return 1
-    elif weekday == 5:
-        return 2
-    elif weekday == 6:
-        return 3
-    else:
-        return 0
-    
-group_weekday = functions.udf(group_weekday_py)
     
 @functions.udf
 def delete_neg(distri):
