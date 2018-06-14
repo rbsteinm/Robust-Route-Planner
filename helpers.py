@@ -13,7 +13,6 @@ from bokeh.plotting import figure, output_file, show, ColumnDataSource
 import time
 import numpy as np
 import pickle
-import spark_helpers
 import functools
 import copy
 
@@ -402,7 +401,7 @@ def shortest_path_reverse(models, walking_network, stations, source, destination
                 current_edge = (u,prev[u][0],prev[u][1],prev[u][2],prev[u][3],prev[u][4])
                 path.append(current_edge)
                 u = prev[u][0] # get previous node
-            current_edge = (prev[u][0],u,prev[u][1],prev[u][2],prev[u][3],prev[u][4])
+            current_edge = (u,prev[u][0],prev[u][1],prev[u][2],prev[u][3],prev[u][4])
             path.append(current_edge)
             return back_to_original_date(path, original_date)
         
@@ -575,11 +574,12 @@ def safest_paths(models, walking_network, stations, source, dest, date, delay_di
     results = [all_paths.pop(0)]
     
     for i in range(n_paths-1):
+        if len(all_paths) == 0:
+            break
         safest_path = max(all_paths, key=lambda item: item[1][1])
         results.append(safest_path)
         all_paths.remove(safest_path)
-        if len(all_paths) == 0:
-            break
+
     return results
     
 
