@@ -546,7 +546,7 @@ def remove_edge(e, net):
     return net
 
 
-def safest_paths(models, walking_network, stations, source, dest, date, delay_distribution, n_iters=100, threshold=0.8, n_paths=4, reverse=False):
+def safest_paths(models, walking_network, stations, source, dest, date, delay_distribution, n_iters=10, threshold=0.8, n_paths=4, reverse=False):
     '''
     tries to compute new shortest paths by iteratively removing the most risky edge of the network
     and recomputing a shortest path from the reduced network.
