@@ -1,4 +1,9 @@
-# DS Lab - Final Assignment: Robust Journey Planning
+# Data Science Project: Robust Route Planner
+
+## Context
+This project was conducted of the scope of Olivier Verscheure's _Lab in data science_ course at EPFL (EE-490).
+
+Authors: Raphaël Steinmann, Pierre Fouche and Matthias Leroy.
 
 ## Problem Motivation
 
