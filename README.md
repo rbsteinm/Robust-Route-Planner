@@ -16,11 +16,11 @@ Probably not. However, most public transport applications will insist on the fir
 
 ## Problem Description
 
-In this final project you will build your own public transport route planner to improve on that. You will reuse the SBB dataset (See next section: [Dataset Description](#dataset-description)).
+The goal of this project is to build a public transport route planner to improve on that using the SBB dataset (See next section: [Dataset Description](#dataset-description)).
 
-Given a desired departure, or arrival time, your route planner will compute the fastest route between two stops within a provided uncertainty tolerance expressed as interquartiles. For instance, "what route from A to B is the fastest at least Q% of the time if I want to leave from A (resp. arrive at B) at instant T". Note that *uncertainty* is a measure of a route not being feasible within the time computed by the algorithm.
+Given a desired departure, or arrival time, the route planner computes the fastest route between two stops within a provided uncertainty tolerance expressed as interquartiles. For instance, "what route from A to B is the fastest at least Q% of the time if I want to leave from A (resp. arrive at B) at instant T". Note that *uncertainty* is a measure of a route not being feasible within the time computed by the algorithm.
 
-In order to answer this question you will need to:
+Here are the objectives of this project:
 
 - Model the public transport infrastructure for your route planning algorithm.
 - Build a predictive model using historical arrival/departure time data and potentially other sources of data for your public transport network.
@@ -28,19 +28,17 @@ In order to answer this question you will need to:
 - Implement a method to test and validate your results.
 - Implement a web visualization to demonstrate your method.
 
-Solving this problem accurately can be difficult. You are allowed a few simplifying assumptions:
+Solving this problem accurately can be difficult, hence the following simplifying assumptions:
 
-- There is no penalty for assuming that delays or travel times on the public transport network are uncorrelated with one another. You will get extra credits if you do.
-- Once a route is computed, a traveller is expected to follow the planned routes to the end, or until it fails with unknown consequences (e.g. miss a connection). You **do not** need to address the case where travellers are able to defer their decisions and adapt their journey "en route", as more information becomes available. This requires to consider all alternative routes (contingency plans) in the computation of the uncertainty levels, which is more difficult to implement.
-- The planner will not need to mitigate the traveller's inconvenience if a plan fails. Two routes with identical travel times under the uncertainty tolerance are equivalent, even if outside this uncertainty tolerance on one route has a much worse outcome than the other.
+- We assume that delays or travel times on the public transport network are uncorrelated with one another.
+- Once a route is computed, a traveller is expected to follow the planned routes to the end, or until it fails with unknown consequences (e.g. miss a connection). We do not address the case where travellers are able to defer their decisions and adapt their journey "en route", as more information becomes available. This requires to consider all alternative routes (contingency plans) in the computation of the uncertainty levels, which is more difficult to implement.
+- The planner does not mitigates the traveller's inconvenience if a plan fails. Two routes with identical travel times under the uncertainty tolerance are equivalent, even if outside this uncertainty tolerance on one route has a much worse outcome than the other.
 
 ## Dataset Description
 
-For this project we will use the data published by the Open Data Platform Swiss Public Transport (<https://opentransportdata.swiss>).
+For this project we use the data published by the Open Data Platform Swiss Public Transport (<https://opentransportdata.swiss>).
 
-You can find the dataset in the following two places.
-- On HDFS at the path `/datasets/project/` (you must log on `iccluster045.iccluster.epfl.ch`).
-- Or you can download it using the following links.
+- The dataset was not uploaded on this repository for file size reasons and can be downloaded using the following links:
     - <https://os.unil.cloud.switch.ch/swift/v1/CFF/2017-09.tar.lzma>
     - <https://os.unil.cloud.switch.ch/swift/v1/CFF/2017-10.tar.lzma>
     - <https://os.unil.cloud.switch.ch/swift/v1/CFF/2017-11.tar.lzma>
@@ -51,11 +49,9 @@ You can find the dataset in the following two places.
     - <https://os.unil.cloud.switch.ch/swift/v1/CFF/2018-04.tar.lzma>
     - <https://os.unil.cloud.switch.ch/swift/v1/CFF/metadata.tar.gz>
 
-The folder contains the actual data [istdaten](<https://opentransportdata.swiss/en/dataset/istdaten>) and the station list data [BFKOORD_GEO](https://opentransportdata.swiss/de/cookbook/hafas-rohdaten-format-hrdf/#Abgrenzung).
-
 Format: the dataset is presented a collection of textfiles with fields separated by ';' (semi-colon). There is one file per day.
 
-Unfortunately, the full description from opentransportdata.swiss is only provided in German. You can use an automated translator (we recommend [DeepL](<https://www.deepl.com>)) to get more information, but here are the relevant column descriptions:
+Unfortunately, the full description from opentransportdata.swiss is only provided in German. Here are the relevant column descriptions:
 
 - `BETRIEBSTAG`: date of the trip
 - `FAHRT_BEZEICHNER`: identifies the trip
@@ -77,7 +73,7 @@ Unfortunately, the full description from opentransportdata.swiss is only provide
 Each line of the file represents a stop and contains arrival and departure times. When the stop is the start or end of a journey, the corresponding columns will be empty (`ANKUNFTSZEIT`/`ABFAHRTSZEIT`).
 In some cases, the actual times were not measured so the `AN_PROGNOSE_STATUS`/`AB_PROGNOSE_STATUS` will be empty or set to `PROGNOSE` and `AN_PROGNOSE`/`AB_PROGNOSE` will be empty.
 
-We will use the SBB data limited around the Zurich area. We will focus on all the stops within 10km of the Zurich train station.
+We only use the SBB data limited around the Zurich area and focus on all the stops within 10km of the Zurich train station.
 
 ## References
 
